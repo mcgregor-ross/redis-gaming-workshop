@@ -1,0 +1,50 @@
+version: '3'
+
+services:
+  redis:
+    image: "redis/redis-stack:6.2.4-v3"
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./datasets:/data
+  grafana:
+    image: grafana/grafana:8.2.2
+    links:
+      - "redis:redis"
+      - "leaderboard:leaderboard"
+    depends_on:
+      - redis
+      - leaderboard
+    ports:
+      - 3000:3000
+    environment:
+      - GF_INSTALL_PLUGINS=redis-datasource,grafana-simple-json-datasource      
+    restart: unless-stopped
+    volumes:
+      - ./datasources:/etc/grafana/provisioning/datasources
+      - ./dashboards:/etc/grafana/provisioning/dashboards
+      - grafana-data:/var/lib/grafana/
+  leaderboard:
+      build: .
+      environment:
+        - REDIS_SERVER=redis
+        - REDIS_LEADERBOARD_SET=LeaderBoards
+      depends_on:
+        - redis
+      ports:
+        - "5000:5000"
+  stats:
+      build: 
+        context: ../go/
+        dockerfile: ../go/Dockerfile
+      environment:
+        - REDIS_SERVER=redis
+      links:
+      - "redis:redis"
+      depends_on: 
+        - redis
+        - leaderboard
+        - grafana
+      
+volumes:
+  grafana-data:
